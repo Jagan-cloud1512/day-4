@@ -1,0 +1,4 @@
+google-genai>=1.0
+groq>=0.9
+pytest>=8.0
+supabase>=2.0
