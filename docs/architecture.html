@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab Equipment Booking Assistant — Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d1117; color: #c9d1d9; min-height: 100vh; padding: 40px 20px; }
+  h1 { text-align: center; font-size: 1.6rem; color: #58a6ff; margin-bottom: 8px; }
+  .subtitle { text-align: center; color: #8b949e; margin-bottom: 40px; font-size: 0.95rem; }
+  .diagram { max-width: 1000px; margin: 0 auto; position: relative; }
+
+  .layer { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+  .layer-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 2px; color: #8b949e; margin-bottom: 16px; }
+
+  .row { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; align-items: stretch; }
+
+  .box { border-radius: 10px; padding: 16px 20px; text-align: center; min-width: 160px; flex: 1; max-width: 280px; }
+  .box h3 { font-size: 0.95rem; margin-bottom: 6px; }
+  .box p { font-size: 0.78rem; color: #8b949e; line-height: 1.4; }
+  .box .tools { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+  .box .tool { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 2px 8px; font-size: 0.7rem; font-family: monospace; color: #c9d1d9; }
+  .box .tool.write { border-color: #f0883e; color: #f0883e; }
+
+  .student { background: #1a3a2a; border: 1px solid #238636; }
+  .student h3 { color: #3fb950; }
+  .queue { background: #1c2536; border: 1px solid #1f6feb; }
+  .queue h3 { color: #58a6ff; }
+  .worker { background: #1c2536; border: 1px solid #1f6feb; }
+  .worker h3 { color: #58a6ff; }
+  .supervisor { background: #2a1f3a; border: 1px solid #8b5cf6; }
+  .supervisor h3 { color: #a78bfa; }
+  .specialist { background: #1a2a3a; border: 1px solid #388bfd; }
+  .specialist h3 { color: #79c0ff; }
+  .readonly { background: #162230; border: 1px solid #1f6feb; }
+  .readonly h3 { color: #58a6ff; }
+  .writeagent { background: #2a1a1a; border: 1px solid #f0883e; }
+  .writeagent h3 { color: #f0883e; }
+  .db { background: #1a2a20; border: 1px solid #238636; }
+  .db h3 { color: #3fb950; }
+  .provider { background: #2a2a1a; border: 1px solid #d29922; }
+  .provider h3 { color: #e3b341; }
+
+  .arrow-section { text-align: center; padding: 8px 0; color: #484f58; font-size: 1.4rem; }
+  .arrow-label { font-size: 0.7rem; color: #8b949e; display: block; margin-top: -4px; }
+
+  .flow { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 16px 0; flex-wrap: wrap; }
+  .flow-arrow { color: #484f58; font-size: 1.2rem; }
+  .flow-box { background: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 6px 14px; font-size: 0.8rem; }
+
+  .legend { max-width: 1000px; margin: 30px auto 0; display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #8b949e; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .features { max-width: 1000px; margin: 30px auto 0; }
+  .features h2 { font-size: 1.1rem; color: #58a6ff; margin-bottom: 16px; }
+  .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .feature { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 18px; }
+  .feature h4 { font-size: 0.85rem; color: #c9d1d9; margin-bottom: 4px; }
+  .feature p { font-size: 0.75rem; color: #8b949e; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<h1>Lab Equipment Booking Assistant</h1>
+<p class="subtitle">Multi-agent system with durable execution, idempotency, and policy enforcement</p>
+
+<!-- Request Flow -->
+<div class="diagram">
+  <div class="flow">
+    <div class="flow-box" style="border-color:#238636;color:#3fb950">Student asks a question</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box" style="border-color:#1f6feb;color:#58a6ff">Queued as a Run</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box" style="border-color:#1f6feb;color:#58a6ff">Worker claims it</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box" style="border-color:#8b5cf6;color:#a78bfa">Supervisor delegates</div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-box" style="border-color:#238636;color:#3fb950">Answer returned</div>
+  </div>
+
+  <!-- Agent Layer -->
+  <div class="layer">
+    <div class="layer-title">Agent Layer</div>
+    <div class="row">
+      <div class="box supervisor">
+        <h3>Supervisor Agent</h3>
+        <p>Talks to the student. Delegates all work to specialists. Has no domain tools.</p>
+        <div class="tools">
+          <span class="tool">ask_inventory</span>
+          <span class="tool">ask_booking</span>
+        </div>
+      </div>
+    </div>
+    <div class="arrow-section">↙ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ↘<br>
+      <span class="arrow-label">delegates with idempotency keys</span>
+    </div>
+    <div class="row">
+      <div class="box readonly">
+        <h3>Inventory Specialist</h3>
+        <p>Read-only. Searches equipment, checks availability. Cannot book or modify anything.</p>
+        <div class="tools">
+          <span class="tool">search_equipment</span>
+          <span class="tool">get_equipment</span>
+        </div>
+      </div>
+      <div class="box writeagent">
+        <h3>Booking Specialist</h3>
+        <p>Bound to one student. Can book equipment and send notifications. Enforces policy from data.</p>
+        <div class="tools">
+          <span class="tool">get_student</span>
+          <span class="tool">check_can_book</span>
+          <span class="tool write">book_equipment</span>
+          <span class="tool write">notify_student</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Execution Layer -->
+  <div class="layer">
+    <div class="layer-title">Execution Layer</div>
+    <div class="row">
+      <div class="box queue">
+        <h3>Job Queue</h3>
+        <p>Runs are queued with status tracking. Lease-based claiming prevents double processing.</p>
+        <div class="tools">
+          <span class="tool">enqueue</span>
+          <span class="tool">claim_next</span>
+          <span class="tool">heartbeat</span>
+          <span class="tool">reap_expired</span>
+        </div>
+      </div>
+      <div class="box worker">
+        <h3>Worker</h3>
+        <p>Claims a run, drives the supervisor loop, records steps. If it dies, another worker picks up.</p>
+        <div class="tools">
+          <span class="tool">run_once</span>
+          <span class="tool">run_until_idle</span>
+        </div>
+      </div>
+      <div class="box provider">
+        <h3>LLM Provider</h3>
+        <p>Pluggable: Groq (qwen-27b), Gemini, or scripted mocks for tests. Identical interface.</p>
+        <div class="tools">
+          <span class="tool">GroqProvider</span>
+          <span class="tool">GeminiProvider</span>
+          <span class="tool">ScriptedProvider</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data Layer -->
+  <div class="layer">
+    <div class="layer-title">Data Layer</div>
+    <div class="row">
+      <div class="box db">
+        <h3>equipment.db</h3>
+        <p>Domain data: students, training certs, equipment, bookings, policies, notifications.</p>
+        <div class="tools">
+          <span class="tool">student</span>
+          <span class="tool">training</span>
+          <span class="tool">equipment</span>
+          <span class="tool">booking</span>
+          <span class="tool">policy</span>
+          <span class="tool">notification</span>
+          <span class="tool">idempotency</span>
+        </div>
+      </div>
+      <div class="box db">
+        <h3>agent.db</h3>
+        <p>Agent memory and job queue: threads, messages, runs, steps, tool calls.</p>
+        <div class="tools">
+          <span class="tool">thread</span>
+          <span class="tool">message</span>
+          <span class="tool">run</span>
+          <span class="tool">run_step</span>
+          <span class="tool">tool_call</span>
+        </div>
+      </div>
+      <div class="box db" style="border-color:#d29922;">
+        <h3 style="color:#e3b341;">Supabase (optional)</h3>
+        <p>Cloud PostgreSQL drop-in replacement for both SQLite databases.</p>
+        <div class="tools">
+          <span class="tool">SupabaseEquipmentDb</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div> Supervisor (delegates only)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div> Read-only specialist</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f0883e"></div> Write specialist (side effects)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3fb950"></div> Database / Storage</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#e3b341"></div> LLM / Cloud provider</div>
+</div>
+
+<!-- Key Features -->
+<div class="features">
+  <h2>Key Design Features</h2>
+  <div class="feature-grid">
+    <div class="feature">
+      <h4>Idempotency</h4>
+      <p>Every side effect runs through EquipmentDb.once() with a key derived from the run and step. Booking and notification are also safe to repeat on their own.</p>
+    </div>
+    <div class="feature">
+      <h4>Crash Recovery</h4>
+      <p>Worker dies → lease expires → another worker claims the run → replays from recorded steps → idempotency keys prevent duplicate bookings.</p>
+    </div>
+    <div class="feature">
+      <h4>Policy in Data</h4>
+      <p>Business rules (max fine, max bookings, training requirements) live in the policy and training tables, not in prompts. Tools enforce them even if the model skips the check.</p>
+    </div>
+    <div class="feature">
+      <h4>Least Privilege</h4>
+      <p>Inventory specialist has zero write tools. Booking specialist is bound to one student's roll number. Supervisor has only delegation tools.</p>
+    </div>
+    <div class="feature">
+      <h4>Durable Queue</h4>
+      <p>Lease-based job queue with heartbeat, expiration reaping, retry with exponential backoff, and dead-lettering after max attempts.</p>
+    </div>
+    <div class="feature">
+      <h4>Pluggable LLM</h4>
+      <p>Groq (fast inference), Gemini (Google), or scripted mocks. Same generate() interface. No API key needed for tests and demo.</p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

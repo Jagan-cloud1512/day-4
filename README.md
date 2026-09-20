@@ -8,11 +8,29 @@ twice.
 
 ## System Architecture
 
-```
-student ─▶ queue (agent.db) ─▶ worker ─▶ supervisor ──ask_inventory──▶ inventory agent ─▶ search_equipment, get_equipment
-                                                     └─ask_booking───▶ booking agent ──▶ get_student, check_can_book,
-                                                                                          book_equipment*, notify_student*
-                                                                            * side effects: run once per key
+> **Interactive diagram**: open [`docs/architecture.html`](docs/architecture.html) in a browser for the full visual version.
+
+```mermaid
+flowchart TD
+    S["Student"] -->|asks question| Q["Job Queue<br/>(agent.db)"]
+    Q -->|claim + lease| W["Worker"]
+    W --> SUP["Supervisor Agent<br/><i>delegates only</i>"]
+    SUP -->|ask_inventory| INV["Inventory Specialist<br/><i>read-only</i>"]
+    SUP -->|ask_booking| BOOK["Booking Specialist<br/><i>bound to one student</i>"]
+    INV -->|search_equipment<br/>get_equipment| EDB[("equipment.db")]
+    BOOK -->|get_student, check_can_book<br/>book_equipment*, notify_student*| EDB
+    W -->|record steps| ADB[("agent.db")]
+    SUP -.->|generate| LLM["LLM Provider<br/>Groq / Gemini / Mock"]
+
+    style S fill:#1a3a2a,stroke:#238636,color:#3fb950
+    style Q fill:#1c2536,stroke:#1f6feb,color:#58a6ff
+    style W fill:#1c2536,stroke:#1f6feb,color:#58a6ff
+    style SUP fill:#2a1f3a,stroke:#8b5cf6,color:#a78bfa
+    style INV fill:#162230,stroke:#1f6feb,color:#58a6ff
+    style BOOK fill:#2a1a1a,stroke:#f0883e,color:#f0883e
+    style EDB fill:#1a2a20,stroke:#238636,color:#3fb950
+    style ADB fill:#1a2a20,stroke:#238636,color:#3fb950
+    style LLM fill:#2a2a1a,stroke:#d29922,color:#e3b341
 ```
 
 ### Component Details
