@@ -77,16 +77,15 @@ flowchart TD
 
 ### Key Design Choices
 
-
-| Concept | Implementation |
-|---|---|
-| **Two databases** | `equipment.db` (domain data) and `agent.db` (memory + queue) |
-| **Six tools** | 2 read-only (search, get) + 4 booking (get_student, check, book, notify) |
-| **Business rules in data** | `policy` table: max_fine_to_book, max_active_bookings; `training` table for cert requirements |
-| **Queue + worker** | Lease-based; dead worker's run is picked up by another |
-| **Idempotency** | Every side effect runs through `EquipmentDb.once`; booking and notification are also safe to repeat on their own |
-| **Multi-agent** | Supervisor delegates to inventory (no write tools) and booking (bound to one student) |
-| **LLM Provider** | Groq (qwen/qwen3.8-27b) or Gemini; scripted mocks for tests/demo |
+| Concept                    | Implementation                                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Two databases**          | `equipment.db` (domain data) and `agent.db` (memory + queue)                                                     |
+| **Six tools**              | 2 read-only (search, get) + 4 booking (get_student, check, book, notify)                                         |
+| **Business rules in data** | `policy` table: max_fine_to_book, max_active_bookings; `training` table for cert requirements                    |
+| **Queue + worker**         | Lease-based; dead worker's run is picked up by another                                                           |
+| **Idempotency**            | Every side effect runs through `EquipmentDb.once`; booking and notification are also safe to repeat on their own |
+| **Multi-agent**            | Supervisor delegates to inventory (no write tools) and booking (bound to one student)                            |
+| **LLM Provider**           | Groq (qwen/qwen3.8-27b) or Gemini; scripted mocks for tests/demo                                                 |
 
 ## Step-by-Step Setup
 
@@ -100,18 +99,21 @@ cd day-4
 ### Step 2: Create Virtual Environment
 
 **Windows (PowerShell):**
+
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
 ```
 
 **Windows (Git Bash):**
+
 ```bash
 python -m venv .venv
 source .venv/Scripts/activate
 ```
 
 **Mac/Linux:**
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -126,6 +128,7 @@ pip install -r requirements.txt
 ```
 
 This installs:
+
 - `groq` — Groq LLM API client
 - `google-genai` — Gemini API client (optional fallback)
 - `pytest` — test runner
@@ -149,6 +152,7 @@ pytest
 ### Step 5: Set Up Groq for Real Models (optional)
 
 **a) Get a Groq API key:**
+
 1. Go to https://console.groq.com
 2. Sign up / log in
 3. Go to API Keys → Create new key
@@ -157,21 +161,25 @@ pytest
 **b) Set the environment variable:**
 
 **Windows (PowerShell):**
+
 ```powershell
 $env:GROQ_API_KEY = "gsk_your_key_here"
 ```
 
 **Windows (CMD):**
+
 ```cmd
 set GROQ_API_KEY=gsk_your_key_here
 ```
 
 **Mac/Linux:**
+
 ```bash
 export GROQ_API_KEY=gsk_your_key_here
 ```
 
 **c) Run with real models:**
+
 ```bash
 python -m scripts.demo --real
 ```
@@ -181,11 +189,13 @@ If `GROQ_API_KEY` is set, Groq is used. Otherwise falls back to Gemini (`export 
 ### Step 6: Two-Terminal Mode (optional)
 
 **Terminal 1 — start the worker:**
+
 ```bash
 python -m scripts.worker
 ```
 
 **Terminal 2 — send questions:**
+
 ```bash
 python -m scripts.ask --student 22CS045 "Do you have an oscilloscope?"
 python -m scripts.ask --student 22IT017 "Can I book a Raspberry Pi?"
@@ -194,39 +204,92 @@ python -m scripts.ask --student 22EC031 "What have I booked?"
 
 ### Step 7: Set Up Supabase (optional — cloud database)
 
+When `USE_SUPABASE=1` is set, the app reads and writes equipment data (students, bookings,
+notifications, idempotency keys) to Supabase/PostgreSQL instead of local SQLite. The agent
+queue (`agent.db`) still uses local SQLite.
+
 **a) Create a Supabase project** at https://supabase.com/dashboard
 
-**b) Run SQL in the Supabase SQL Editor** (in order):
-1. `schema/supabase_library.sql` — creates equipment tables
-2. `schema/supabase_agent.sql` — creates agent tables
-3. `schema/supabase_setup.sql` — disables RLS + seeds data
+**b) Run SQL in the Supabase SQL Editor** (in this order):
 
-**c) Set environment variables:**
+1. `schema/supabase_library.sql` — creates equipment domain tables (student, training, equipment, booking, policy, notification, idempotency)
+2. `schema/supabase_agent.sql` — creates agent tables (thread, message, run, run_step, tool_call)
+3. `schema/supabase_setup.sql` — disables Row Level Security + seeds all data (3 students, 3 training certs, 6 equipment, 2 policies, 1 existing booking)
+
+**c) Get your credentials** from Supabase → Settings → API:
+- **Project URL**: `https://<your-project-ref>.supabase.co`
+- **Anon key**: the public anon key (safe for client-side use)
+
+**d) Set environment variables:**
 
 **Windows (PowerShell):**
+
 ```powershell
 $env:SUPABASE_URL = "https://your-project-ref.supabase.co"
 $env:SUPABASE_KEY = "your-anon-key"
 $env:USE_SUPABASE = "1"
 ```
 
+**Windows (CMD):**
+
+```cmd
+set SUPABASE_URL=https://your-project-ref.supabase.co
+set SUPABASE_KEY=your-anon-key
+set USE_SUPABASE=1
+```
+
 **Mac/Linux:**
+
 ```bash
 export SUPABASE_URL="https://your-project-ref.supabase.co"
 export SUPABASE_KEY="your-anon-key"
 export USE_SUPABASE=1
 ```
 
+**e) Run with Supabase:**
+
+```bash
+# Scripted demo (reads/writes equipment data to Supabase)
+python -m scripts.demo
+
+# Real Groq models + Supabase storage
+python -m scripts.demo --real
+```
+
+After running, check your Supabase Table Editor — you'll see new bookings, notifications,
+and idempotency keys stored in the cloud.
+
+**What's stored where with Supabase enabled:**
+
+| Database | Tables | Storage |
+|---|---|---|
+| `equipment.db` → **Supabase** | student, training, equipment, booking, policy, notification, idempotency | Cloud (PostgreSQL) |
+| `agent.db` | thread, message, run, run_step, tool_call | Local (SQLite) |
+
 ## Quick Reference
 
 | Command | What it does | Needs API key? |
 |---|---|---|
-| `python -m scripts.demo` | Full demo, scripted models | No |
+| `python -m scripts.demo` | Full demo, scripted models, local SQLite | No |
 | `python -m scripts.demo --crash` | Crash recovery demo, prints PASS | No |
 | `pytest` | Run all 24 tests | No |
 | `python -m scripts.demo --real` | Demo with real Groq models | Yes (`GROQ_API_KEY`) |
 | `python -m scripts.worker` | Start a worker (Terminal 1) | Yes (`GROQ_API_KEY`) |
 | `python -m scripts.ask "question"` | Queue a question (Terminal 2) | No (worker needs key) |
+
+### Environment Variables
+
+| Variable | Required? | Default | Description |
+|---|---|---|---|
+| `GROQ_API_KEY` | For `--real` mode | — | Groq API key from https://console.groq.com |
+| `GROQ_MODEL` | No | `qwen/qwen3.8-27b` | Groq model to use |
+| `GEMINI_API_KEY` | Fallback if no Groq | — | Google Gemini API key |
+| `GEMINI_MODEL` | No | `gemini-2.5-flash` | Gemini model to use |
+| `USE_SUPABASE` | No | `0` | Set to `1` to use Supabase instead of local SQLite |
+| `SUPABASE_URL` | If USE_SUPABASE=1 | — | Supabase project URL |
+| `SUPABASE_KEY` | If USE_SUPABASE=1 | — | Supabase anon key |
+| `AGENT_DB` | No | `agent.db` | Path to agent SQLite database |
+| `EQUIPMENT_DB` | No | `equipment.db` | Path to equipment SQLite database (ignored if Supabase) |
 
 ## Workflow
 
@@ -306,11 +369,11 @@ Student 22IT017 (fine = Rs 75): "Can I book an Arduino?"
 
 ## Seed Data
 
-| Student | Fine | Max bookings | Training | What happens |
-|---|---|---|---|---|
-| 22CS045 Priya Raman | Rs 0 | 2 | electronics, 3dprinting | Can book |
-| 22IT017 Arjun Kumar | Rs 75 | 2 | none | Refused: fine above Rs 50 policy |
-| 22EC031 Divya Sekar | Rs 0 | 1 | electronics | Refused: already holds 1 booking |
+| Student             | Fine  | Max bookings | Training                | What happens                     |
+| ------------------- | ----- | ------------ | ----------------------- | -------------------------------- |
+| 22CS045 Priya Raman | Rs 0  | 2            | electronics, 3dprinting | Can book                         |
+| 22IT017 Arjun Kumar | Rs 75 | 2            | none                    | Refused: fine above Rs 50 policy |
+| 22EC031 Divya Sekar | Rs 0  | 1            | electronics             | Refused: already holds 1 booking |
 
 Equipment: 1 Oscilloscope (3 units, needs electronics), 2 Arduino Mega (4 of 5 on shelf),
 3 3D Printer Prusa (1 unit, needs 3dprinting), 4 Raspberry Pi 5 (4 units),
@@ -328,3 +391,4 @@ Equipment: 1 Oscilloscope (3 units, needs electronics), 2 Arduino Mega (4 of 5 o
 | Two+ agents | Supervisor → inventory specialist (read-only) + booking specialist (write) |
 | Proof without key | `python -m scripts.demo`, `python -m scripts.demo --crash` prints PASS, `pytest` |
 | Groq real-model run | `python -m scripts.demo --real` with GROQ_API_KEY set |
+| Supabase cloud database | `app/supabase_db.py`, `app/config.py` (USE_SUPABASE=1), `schema/supabase_setup.sql` |
