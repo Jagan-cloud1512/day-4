@@ -33,14 +33,18 @@ def main() -> None:
     p.add_argument("--crash", action="store_true")
     a = p.parse_args()
 
+    use_supabase = os.environ.get("USE_SUPABASE", "").strip() == "1"
     tmp = tempfile.mkdtemp(prefix="equipment-demo-")
-    os.environ["AGENT_DB"], os.environ["EQUIPMENT_DB"] = os.path.join(tmp, "agent.db"), os.path.join(tmp, "equipment.db")
+    os.environ["AGENT_DB"] = os.path.join(tmp, "agent.db")
+    if not use_supabase:
+        os.environ["EQUIPMENT_DB"] = os.path.join(tmp, "equipment.db")
     from app.config import make_providers, open_stores
     from app.worker import Worker
 
     store, db = open_stores()
     providers = make_providers(mock=not a.real)
-    print(f"{DIM}databases in {tmp}   model: {providers['supervisor'].model}{RESET}")
+    db_label = "supabase" if use_supabase else tmp
+    print(f"{DIM}databases in {db_label}   model: {providers['supervisor'].model}{RESET}")
     print(f"{DIM}before: {counts(db)}{RESET}\n")
 
     questions = QUESTIONS[:1] if a.crash else QUESTIONS

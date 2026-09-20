@@ -80,7 +80,7 @@ class SupabaseEquipmentDb:
         return r.data[0] if r.data else None
 
     def count(self, table: str) -> int:
-        r = self.client.table(table).select("id", count="exact").execute()
+        r = self.client.table(table).select("*", count="exact").limit(0).execute()
         return r.count or 0
 
     def book(self, student_id: int, equipment_id: int) -> str:
